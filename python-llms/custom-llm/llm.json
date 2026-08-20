@@ -1,0 +1,65 @@
+/* This file is the descriptor for custom LLM ge-custom-sm-llm */
+{
+  "meta" : {
+    // label: name of the LLM as displayed, should be short
+    "label": "Sample Custom LLM using Python",
+
+    // description: longer string to help end users understand what this LLM does.
+    "description": "This sample code is created for building custom LLM using python.",
+
+    // icon: must be one of the FontAwesome 5.15.4 icons, complete list here at https://fontawesome.com/v5/docs/
+    "icon": "fas fa-magic"
+  },
+
+  /* params:
+  DSS will generate a form from this list of requested parameters.
+  Your component code can then access the value provided by users using the "name" field of each parameter.
+
+  Available parameter types include:
+  STRING, INT, DOUBLE, BOOLEAN, DATE, SELECT, TEXTAREA, PRESET and others.
+
+  For the full list and for more details, see the documentation: https://doc.dataiku.com/dss/latest/plugins/reference/params.html
+  */
+  "params": [ 
+        {
+            "name": "iam_roles_anywhere",
+            "label": "IAM Roles Anywhere preset",
+            "type": "PRESET",
+            "parameterSetId": "iam-roles-anywhere"
+        },
+        {   
+            "name": "api_keys",
+            "label": "API Key preset",
+            "type": "PRESET",
+            "parameterSetId": "api-credentials"
+        }, 
+        {
+            "name": "custom_ca_path",
+            "label": "Custom CA Path preset",
+            "type": "PRESET",
+            "parameterSetId": "custom-ca-path"
+        }, 
+        {
+            "name": "model",
+            "label": "Model Key",
+            "type": "STRING",
+            "description": "Model value supported by the API endpoint. For reference visit: https://build.nvidia.com/explore/discover",
+            "defaultValue": "openai/gpt-oss-20b",
+            "mandatory": true
+        },
+        {
+            "name": "prompt_cost",
+            "label": "Prompt Cost",
+            "type": "DOUBLE",
+            "description": "In $/1k tokens",
+            "defaultValue": 0.0
+        },
+        {
+            "name": "completion_cost",
+            "label": "Completion Cost",
+            "type": "DOUBLE",
+            "description": "In $/1k tokens",
+            "defaultValue": 0.0
+        }
+  ]
+}

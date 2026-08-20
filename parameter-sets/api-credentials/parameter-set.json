@@ -1,0 +1,30 @@
+{
+    "meta" : {
+        "label": "API Key",
+        "description": "Define a preset that DSS users can use to authenticate to the API Gateway Endpoint.",
+        "icon": "icon-cloud"
+    },
+    "defaultDefinableInline": true,
+    "defaultDefinableAtProjectLevel": true,
+    "pluginParams": [
+    ],
+
+    "params": [
+        {
+            "name": "api_gateway_url",
+            "label": "API Gateway URL",
+            "type": "STRING",
+            "description": "The endpoint URL of the API Gateway",
+            "mandatory": true
+
+        },
+        {
+            "name": "api_key",
+            "label": "API Key",
+            "type": "PASSWORD",
+            "description": "API Key configured at the API Gateway",
+            "mandatory": true
+
+        }
+    ]
+}

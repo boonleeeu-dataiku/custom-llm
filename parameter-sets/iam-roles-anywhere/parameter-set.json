@@ -1,0 +1,81 @@
+{
+    "meta" : {
+        "label": "IAM Roles Anywhere",
+        "description": "Define a preset that DSS users can use to authenticate into IAM Roles Anywhere Endpoint.",
+        "icon": "icon-cloud"
+    },
+    "defaultDefinableInline": true,
+    "defaultDefinableAtProjectLevel": true,
+    "pluginParams": [
+    ],
+
+    "params": [
+        {
+            "name": "certificate_path",
+            "label": "Certificate Path",
+            "type": "STRING",
+            "description": "The full path name of the TLS certificate to authenticate with IAM Roles Anywhere",
+            "mandatory": true
+
+        },
+        {
+            "name": "private_key_path",
+            "label": "Private Key Path",
+            "type": "STRING",
+            "description": "The full path name of the TLS private key to authenticate with IAM Roles Anywhere",
+            "mandatory": true
+
+        },
+        {
+            "name": "trust_anchor_arn",
+            "label": "Trust Anchor ARN",
+            "type": "STRING",
+            "description": "The ARN of the Trust Anchor to use configured at IAM Roles Anywhere",
+            "mandatory": true
+
+        },
+        {
+            "name": "profile_arn",
+            "label": "Profile ARN",
+            "type": "STRING",
+            "description": "The ARN of the Profile to pull policies, attribute mappings and other data configured at IAM Roles Anywhere",
+            "mandatory": true
+
+        },
+        {
+            "name": "base_role_arn",
+            "label": "Base Role ARN",
+            "type": "STRING",
+            "description": "The Base Role ARN to authenticate via x509 certificate and aws_signing_helper",
+            "mandatory": true
+
+        },
+        {
+            "name": "target_role_enable",
+            "label": "Assume Target Role",
+            "type": "BOOLEAN",
+            "description": "Enable to assume a Target Role",
+            "defaultValue": false,
+            "mandatory": false
+
+        },
+        {
+            "name": "target_role_arn",
+            "label": "Target Role ARN",
+            "type": "STRING",
+            "description": "The Target Role ARN to assume to access AWS resources",
+            "mandatory": false,
+            "visibilityCondition": "model.target_role_enable"
+
+        },
+        {
+            "name": "region",
+            "label": "Region",
+            "type": "STRING",
+            "defaultValue": "ap-southeast-1",
+            "description": "The AWS Region configured for IAM Roles Anywhere",
+            "mandatory": true
+
+        }
+    ]
+}

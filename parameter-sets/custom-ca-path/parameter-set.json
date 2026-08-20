@@ -1,0 +1,23 @@
+{
+    "meta" : {
+        "label": "Custom CA Path",
+        "description": "Define a preset that DSS can reference for trusted CA certificate.",
+        "icon": "icon-cloud"
+    },
+    "defaultDefinableInline": true,
+    "defaultDefinableAtProjectLevel": true,
+    "pluginParams": [
+    ],
+
+    "params": [
+        {
+            "name": "ca_path",
+            "label": "Custom CA Path",
+            "type": "STRING",
+            "defaultValue": "/data_dataiku_design/ge-cabundle.pem",
+            "description": "The full path name of the custom trusted CA certificate on DSS",
+            "mandatory": false
+
+        }
+    ]
+}
