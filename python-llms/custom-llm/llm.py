@@ -1,21 +1,98 @@
 # This file is the implementation of custom LLM ge-custom-sm-llm
 from dataiku.llm.python import BaseLLM
 from dataiku.llm.python import BaseEmbeddingModel
-from dataiku.llm.python import BaseImageGenerationModel
 
 import logging
 import requests
-import json
 from customllm import utils
 
 import boto3
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
 
 # Create logger
 logger = logging.getLogger(__name__)
+
+
+class ConfigError(ValueError):
+    pass
+
+
+class AWSGatewayMixin:
+    def _load_common_config(self, config: dict, plugin_config: dict) -> None:
+        self.config = config
+        self.plugin_config = plugin_config
+
+        api_cfg = config.get("api_keys") or {}
+        iam_cfg = config.get("iam_roles_anywhere") or {}
+        ca_cfg = config.get("custom_ca_path") or {}
+
+        self.api_gateway_url = api_cfg.get("api_gateway_url")
+        self.api_key = api_cfg.get("api_key")
+        self.model = config.get("model")
+        self.prompt_cost = config.get("prompt_cost", 0.0)
+        self.completion_cost = config.get("completion_cost", 0.0)
+
+        self.certificate_path = iam_cfg.get("certificate_path")
+        self.private_key_path = iam_cfg.get("private_key_path")
+        self.trust_anchor_arn = iam_cfg.get("trust_anchor_arn")
+        self.profile_arn = iam_cfg.get("profile_arn")
+        self.base_role_arn = iam_cfg.get("base_role_arn")
+        self.target_role_enable = bool(iam_cfg.get("target_role_enable", False))
+        self.target_role_arn = iam_cfg.get("target_role_arn")
+        self.region = iam_cfg.get("region") or "ap-southeast-1"
+        self.ca_path = ca_cfg.get("ca_path") or "/data_dataiku_design/ge-cabundle.pem"
+
+    def _validate_common_config(self) -> None:
+        missing = []
+        if not self.api_gateway_url:
+            missing.append("api_keys.api_gateway_url")
+        if not self.api_key:
+            missing.append("api_keys.api_key")
+        if not self.model:
+            missing.append("model")
+        if not self.certificate_path:
+            missing.append("iam_roles_anywhere.certificate_path")
+        if not self.private_key_path:
+            missing.append("iam_roles_anywhere.private_key_path")
+        if not self.trust_anchor_arn:
+            missing.append("iam_roles_anywhere.trust_anchor_arn")
+        if not self.profile_arn:
+            missing.append("iam_roles_anywhere.profile_arn")
+        if not self.base_role_arn:
+            missing.append("iam_roles_anywhere.base_role_arn")
+        if not self.region:
+            missing.append("iam_roles_anywhere.region")
+        if not self.ca_path:
+            missing.append("custom_ca_path.ca_path")
+        if self.target_role_enable and not self.target_role_arn:
+            missing.append("iam_roles_anywhere.target_role_arn")
+
+        if missing:
+            raise ConfigError("Missing required plugin configuration: {}".format(", ".join(missing)))
+
+    def _create_aws_session(self):
+        logger.info("Getting credentials from IAM Roles Anywhere...")
+        creds = utils.get_credentials(
+            self.certificate_path,
+            self.private_key_path,
+            self.trust_anchor_arn,
+            self.profile_arn,
+            self.base_role_arn,
+            self.region,
+        )
+
+        logger.info("Creating boto3 session with temporary credentials...")
+        base_session = boto3.Session(
+            aws_access_key_id=creds['AccessKeyId'],
+            aws_secret_access_key=creds['SecretAccessKey'],
+            aws_session_token=creds['SessionToken'],
+            region_name=self.region
+        )
+
+        if self.target_role_enable:
+            return utils.get_assumed_role_session(base_session, self.target_role_arn, self.region)
+        return base_session
     
-class MyLLM(BaseLLM):
+class MyLLM(AWSGatewayMixin, BaseLLM):
     def __init__(self):
         """
         Constructor for the MyLLM class.
@@ -48,39 +125,8 @@ class MyLLM(BaseLLM):
             plugin_config (dict): A dictionary of the plugin-level settings.
         """
         logger.info("Setting configuration for MyLLM")
-        self.config = config
-        self.plugin_config = plugin_config
-        
-        # When using a PRESET, the value is a dictionary
-        self.api_gateway_url = config.get('api_keys', {}).get('api_gateway_url')
-        self.api_key = config.get('api_keys', {}).get('api_key')
-        self.model = config.get('model')
-        self.prompt_cost = config.get('prompt_cost', 0.0)
-        self.completion_cost = config.get('completion_cost', 0.0)
-               
-        self.certificate_path = config.get('iam_roles_anywhere',{}).get('certificate_path')
-        self.private_key_path = config.get('iam_roles_anywhere', {}).get('private_key_path')
-        self.trust_anchor_arn = config.get('iam_roles_anywhere', {}).get('trust_anchor_arn')
-        self.profile_arn = config.get('iam_roles_anywhere', {}).get('profile_arn')
-        self.base_role_arn = config.get('iam_roles_anywhere', {}).get('base_role_arn')
-        self.target_role_enable = config.get('iam_roles_anywhere', {}).get('target_role_enable')
-        self.target_role_arn = config.get('iam_roles_anywhere', {}).get('target_role_arn')
-        self.region = config.get('iam_roles_anywhere', "ap-southeast-1").get('region')
-        self.ca_path = config.get('custom_ca_path', "/data_dataiku_design/ge-cabundle.pem").get('ca_path')
-       
-        
-#         logger.debug(f"Configured API gateway endpoint: {self.api_gateway_url}")
-#         logger.debug(f"Configured API Key: {self.api_key}")
-#         logger.debug(f"Configured model: {self.model}")
-#         logger.debug(f"Configured certificate_path: {self.certificate_path}")
-#         logger.debug(f"Configured private_key_path: {self.private_key_path}")
-#         logger.debug(f"Configured trust_anchor_arn: {self.trust_anchor_arn}")
-#         logger.debug(f"Configured profile_arn: {self.profile_arn}")
-#         logger.debug(f"Configured base_role_arn: {self.base_role_arn}")
-#         logger.debug(f"Configured target_role_enable: {self.target_role_enable}")
-#         logger.debug(f"Configured target_role_arn: {self.target_role_arn}")
-#         logger.debug(f"Configured region: {self.region}")
-#         logger.debug(f"Configured ca_path: {self.ca_path}")
+        self._load_common_config(config, plugin_config)
+        self._validate_common_config()
         
 
     def process(self, query, settings, trace):
@@ -99,36 +145,17 @@ class MyLLM(BaseLLM):
             ConnectionError: If the API request fails.
         """       
         
-        # Get credentials from IAM Roles Anywhere
-        logger.info("Getting credentials from IAM Roles Anywhere...")
-        creds = utils.get_credentials(self.certificate_path, self.private_key_path, self.trust_anchor_arn, self.profile_arn, self.base_role_arn, self.region)
-        
-        # Create boto3 session with temporary credentials
-        logger.info("Creating boto3 session with temporary credentials...")
-        base_session = boto3.Session(
-            aws_access_key_id=creds['AccessKeyId'],
-            aws_secret_access_key=creds['SecretAccessKey'],
-            aws_session_token=creds['SessionToken'],
-            region_name=self.region
-        )
+        session = self._create_aws_session()
 
-        if self.target_role_enable:
-            target_session = utils.get_assumed_role_session(base_session, self.target_role_arn, self.region)
-
-        logger.info(f"Processing non-streaming request")
+        logger.info("Processing non-streaming request")
         # This method handles non-streaming requests.
         # We explicitly set stream to False in the payload.
-        settings['stream'] = False
-        #headers = utils.create_auth_headers(self.api_key)
-        payload = utils.create_payload_ge_custom_text(self.model, query, settings)
+        request_settings = dict(settings or {})
+        request_settings['stream'] = False
+        payload = utils.create_payload_ge_custom_text(self.model, query, request_settings)
                 
         try:
-        
-            if self.target_role_enable:
-                response = utils.call_api_gateway(target_session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
-            else:
-                response = utils.call_api_gateway(base_session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
-            
+            response = utils.call_api_gateway(session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
             response.raise_for_status()
             response_data = response.json()
             
@@ -138,6 +165,9 @@ class MyLLM(BaseLLM):
 
             return utils.parse_response(response_data, self.prompt_cost, self.completion_cost)
 
+        except (ValueError, KeyError) as e:
+            logger.error("Failed to parse LLM response: %s", e, exc_info=True)
+            raise RuntimeError(f"Failed to parse LLM response: {e}")
         except requests.exceptions.RequestException as e:
             # Handle exceptions for network errors, non-200 responses, etc.
             logger.error(f"API request failed: {e}", exc_info=True)
@@ -188,7 +218,7 @@ class MyLLM(BaseLLM):
 #             logger.error(f"API streaming request failed: {e}", exc_info=True)
 #             raise ConnectionError(f"API request failed: {e}")
 
-class MyEmbeddingModel(BaseEmbeddingModel):
+class MyEmbeddingModel(AWSGatewayMixin, BaseEmbeddingModel):
     def __init__(self):
         """
         Constructor for the MyEmbeddingModel class.
@@ -218,35 +248,8 @@ class MyEmbeddingModel(BaseEmbeddingModel):
             plugin_config (dict): A dictionary of the plugin-level settings.
         """
         logger.info("Setting configuration for MyEmbeddingModel")
-        self.config = config
-        self.plugin_config = plugin_config
-        self.api_gateway_url = config.get('api_keys', {}).get('api_gateway_url')
-        self.api_key = config.get('api_keys', {}).get('api_key')
-        self.model = config.get('model')
-        self.prompt_cost = config.get('prompt_cost', 0.0)
-             
-        self.certificate_path = config.get('iam_roles_anywhere',{}).get('certificate_path')
-        self.private_key_path = config.get('iam_roles_anywhere', {}).get('private_key_path')
-        self.trust_anchor_arn = config.get('iam_roles_anywhere', {}).get('trust_anchor_arn')
-        self.profile_arn = config.get('iam_roles_anywhere', {}).get('profile_arn')
-        self.base_role_arn = config.get('iam_roles_anywhere', {}).get('base_role_arn')
-        self.target_role_enable = config.get('iam_roles_anywhere', {}).get('target_role_enable')
-        self.target_role_arn = config.get('iam_roles_anywhere', {}).get('target_role_arn')
-        self.region = config.get('iam_roles_anywhere', "ap-southeast-1").get('region')
-        self.ca_path = config.get('custom_ca_path', "/data_dataiku_design/ge-cabundle.pem").get('ca_path')
-
-#         logger.debug(f"Configured API gateway endpoint: {self.api_gateway_url}")
-#         logger.debug(f"Configured API Key: {self.api_key}")
-#         logger.debug(f"Configured model: {self.model}")
-#         logger.debug(f"Configured certificate_path: {self.certificate_path}")
-#         logger.debug(f"Configured private_key_path: {self.private_key_path}")
-#         logger.debug(f"Configured trust_anchor_arn: {self.trust_anchor_arn}")
-#         logger.debug(f"Configured profile_arn: {self.profile_arn}")
-#         logger.debug(f"Configured base_role_arn: {self.base_role_arn}")
-#         logger.debug(f"Configured target_role_enable: {self.target_role_enable}")
-#         logger.debug(f"Configured target_role_arn: {self.target_role_arn}")
-#         logger.debug(f"Configured region: {self.region}")
-#         logger.debug(f"Configured ca_path: {self.ca_path}")
+        self._load_common_config(config, plugin_config)
+        self._validate_common_config()
 
     def process(self, query, settings, trace):
         """
@@ -265,21 +268,7 @@ class MyEmbeddingModel(BaseEmbeddingModel):
             ConnectionError: If the API request fails.
         """
         
-        # Get credentials from IAM Roles Anywhere
-        logger.info("Getting credentials from IAM Roles Anywhere...")
-        creds = utils.get_credentials(self.certificate_path, self.private_key_path, self.trust_anchor_arn, self.profile_arn, self.base_role_arn, self.region)
-        
-        # Create boto3 session with temporary credentials
-        logger.info("Creating boto3 session with temporary credentials...")
-        base_session = boto3.Session(
-            aws_access_key_id=creds['AccessKeyId'],
-            aws_secret_access_key=creds['SecretAccessKey'],
-            aws_session_token=creds['SessionToken'],
-            region_name=self.region
-        )
-
-        if self.target_role_enable:
-            target_session = utils.get_assumed_role_session(base_session, self.target_role_arn, self.region)
+        session = self._create_aws_session()
             
         logger.info("Processing embedding request")
         text_to_embed = query.get('text')
@@ -299,12 +288,7 @@ class MyEmbeddingModel(BaseEmbeddingModel):
         }
 
         try: 
-            
-            if self.target_role_enable:
-                response = utils.call_api_gateway(target_session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
-            else:
-                response = utils.call_api_gateway(base_session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
-                
+            response = utils.call_api_gateway(session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
             response.raise_for_status()
             response_data = response.json()
 
@@ -328,6 +312,9 @@ class MyEmbeddingModel(BaseEmbeddingModel):
                 "promptTokens": prompt_tokens,
                 "estimatedCost": cost
             }
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error("Failed to parse embedding response: %s", e, exc_info=True)
+            raise RuntimeError(f"Failed to parse embedding response: {e}")
         except requests.exceptions.RequestException as e:
             logger.error(f"API request for embedding failed: {e}", exc_info=True)
             raise ConnectionError(f"API request for embedding failed: {e}")
