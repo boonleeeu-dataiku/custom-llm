@@ -1,8 +1,8 @@
 # Python Custom LLM Plugin modified for Great Eastern Life
 
-This project provides a sample custom Large Language Model (LLM) connector for Dataiku DSS, built using the Python LLM framework. The sample is built for the OpenAI API format but can be easily updated to handle different API structures and handling modes. It is designed to connect to any OpenAI-compatible API endpoint, such as the NVIDIA API Catalog, out of the box. 
+This project provides a custom Large Language Model (LLM) connector for Dataiku DSS, built using the Python LLM framework. While the original sample was designed for OpenAI-compatible APIs, this implementation has been customized for Great Eastern Life (GE) to route requests through an AWS API Gateway endpoint protected with IAM Roles Anywhere and SigV4 signing.
 
-This has been further customized for Great Eastern Life(GE) to support authentication with IAM Roles Anywhere service to retrieve temporary security credentials that will be used to call into the API Gateway. The AWS setup at GE's requires the plugin to first send requests into the API Gateway backed by Lambda function into SageMaker service. 
+In GE's setup, the plugin first obtains temporary AWS credentials using IAM Roles Anywhere, optionally assumes a target role, signs the request to API Gateway, and then sends the payload to the backend service backed by Lambda and SageMaker.
 
 
 ## Standard Features 
@@ -10,32 +10,32 @@ This has been further customized for Great Eastern Life(GE) to support authentic
 This plugin supports the core functionalities required for modern LLM applications within Dataiku:
 
 1.  **Chat Completion**: Full support for conversational text generation.
-    -   **Streaming**: Responses can be streamed back to the user interface for a real-time experience.
     -   **Tool Calling**: The LLM can invoke tools (e.g., Dataiku Functions or Datasets) as part of its response generation, enabling it to interact with external systems.
     -   **Multimodal Support**: Compatible with Vision Language Models (VLMs) for multimodal chat completion, supporting both text and image inputs (inline base64 images and image URLs).
     -   **Usage Tracking**: Captures token usage (`prompt_tokens`, `completion_tokens`) and calculates the estimated cost for each API call.
+    -   **GE Custom Payload Format**: Transforms Dataiku messages into the request structure expected by GE's API Gateway backend.
 
 
 2.  **Text Embedding**: Generate vector embeddings for text inputs, which is essential for Retrieval-Augmented Generation (RAG), semantic search, and other NLP tasks.
-    -   **Multimodal Embedding**: Supports VLM-based embedding models that can generate embeddings from both text and images.
+    -   **Usage Tracking**: Captures prompt token usage and calculates the estimated cost for embedding requests.
 
 
 ## IAM Roles Anywhere
 
 1.  **IAM Roles Anywhere**: Added support to authentication with IAM Roles Anywhere
-    -   **aws_helper_tool**: This is AWS provided tool to be run in shell to authenticate with IAM Roles Anywhere service. Downloaded from AWS official repo and to be installed on the DSS node. Refer [AWS Website](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/credential-helper.html) for more information.
-    -   **boto3**: Code-env with boto3 required for this plugin.
-    -   **Additions**: Preset parameters added for IAM Roles Anywhere, API Gateway URL and API Key and path to GE's private CA cabundle.pem (needed to verify in request). Two main functions, get_credentials and call_api_gateway added to retrieve temporary security credentials and call the API Gateway with the credentials respectively.
+    -   **aws_signing_helper**: AWS-provided command line helper used to authenticate with IAM Roles Anywhere and retrieve temporary credentials. It must be installed on the DSS node and available on `PATH`. Refer [AWS Website](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/credential-helper.html) for more information.
+    -   **boto3**: Required in the plugin code environment to create AWS sessions and optionally assume a target role.
+    -   **Additions**: Preset parameters added for IAM Roles Anywhere, API Gateway URL and API Key, and the path to GE's private CA bundle used for TLS verification. The helper functions `get_credentials`, `get_assumed_role_session`, and `call_api_gateway` handle credential retrieval, optional role assumption, and signed API Gateway calls.
 
 
 ## How It Works
 
 The plugin consists of two main components that integrate with the Dataiku LLM Mesh:
 
-*   `MyLLM`: A class that handles chat completion requests. It transforms Dataiku's native query format into the format expected by OpenAI-compatible APIs, including the specific message structure required for tool calling. It processes both standard and streaming responses.
-*   `MyEmbeddingModel`: A class dedicated to handling text embedding requests. It constructs the appropriate payload, calls the embedding endpoint, and returns the vector in a format that Dataiku can use.
+*   `MyLLM`: A class that handles chat completion requests. It validates the configured presets, creates an AWS session from IAM Roles Anywhere credentials, transforms Dataiku's native query format into the format expected by GE's backend, and parses the response into the structure expected by Dataiku.
+*   `MyEmbeddingModel`: A class dedicated to handling text embedding requests. It uses the same authentication flow, sends a text embedding payload to the backend endpoint, and returns the vector in a format that Dataiku can use.
 
-Helper functions in `customllm/utils.py` manage API authentication, payload creation, and response parsing.
+Helper functions in `customllm/utils.py` manage credential retrieval, SigV4 request signing, payload creation, response parsing, cost calculation, and multimodal message conversion.
 
 ## Setup and Configuration
 
@@ -46,16 +46,18 @@ Follow these steps to set up and use this custom LLM plugin in your Dataiku DSS 
 -   Zip the contents of this repository.
 -   In Dataiku DSS, navigate to **Administration > Plugins > Add Plugin > Upload**.
 -   Upload the zipped plugin file.
+-   Ensure the `aws_signing_helper` binary is installed on the DSS node and available to the DSS process.
 
 ### 2. Create Presets
 
 There are three presets to populate - (1)API Key, (2)Custom CA Path and (3)IAM Roles Anywhere.
 
 1.  Go to **Plugin > Settings**.
-2.  Click **+ Add Preset** for **API Key** and populate the API Gateway's URL and API Key.
-3.  Click **+ Add Preset** for **Custom CA Path** and populate the full pathname of the cabundle file on DSS. 
-4.  Click **+ Add Preset** for **IAM Roles Anywhere** and populate the necessary parameters. 
-5.  Save the preset.
+2.  Click **+ Add Preset** for **API Key** and populate the API Gateway URL and API Key.
+3.  Click **+ Add Preset** for **Custom CA Path** and populate the full pathname of the CA bundle file on DSS. If left blank, the plugin defaults to `/data_dataiku_design/ge-cabundle.pem`.
+4.  Click **+ Add Preset** for **IAM Roles Anywhere** and populate the certificate path, private key path, trust anchor ARN, profile ARN, base role ARN, and region.
+5.  If cross-account access is required, enable **Assume Target Role** and populate the **Target Role ARN**.
+6.  Save the preset.
 
 ### 3. Configure a Chat/Completion Connection
 
@@ -65,11 +67,11 @@ To use the chat model for text generation:
 2.  Navigate to the **Connections** tab and click **+ New Connection**.
 3.  Select **Sample Custom LLM using python** from the list.
 4.  Configure the settings:
-    -   **Endpoint URL**: The API endpoint for chat completions.
-        -   *Example*: `https://integrate.api.nvidia.com/v1/chat/completions`
-    -   **Keys preset**: Select the credential preset you created in the previous step.
-    -   **Model Key**: The identifier for the model you want to use.
-        -   *Example*: `meta/llama-3.1-405b-instruct`
+    -   **IAM Roles Anywhere preset**: Select the IAM Roles Anywhere preset you created in the previous step.
+    -   **API Key preset**: Select the API Gateway preset you created in the previous step.
+    -   **Custom CA Path preset**: Select the CA path preset if TLS verification requires a private CA bundle.
+    -   **Model Key**: The identifier for the model that the backend service should use.
+        -   *Example*: `openai/gpt-oss-20b`
     -   **Prompt Cost / Completion Cost**: (Optional) Enter the cost per 1,000 tokens to enable cost tracking.
 5.  Save the connection. You can now use it in your AI-powered components in Dataiku.
 
@@ -80,11 +82,10 @@ To use the model for generating text embeddings:
 1.  In the LLM Mesh, click **+ New Connection**.
 2.  Select **Sample Custom LLM using python**.
 3.  Configure the settings:
-    -   **Endpoint URL**: The API endpoint for embeddings.
-        -   *Example*: `https://integrate.api.nvidia.com/v1/embeddings`
-    -   **Keys preset**: Select the same credential preset.
-    -   **Model Key**: The identifier for the embedding model.
-        -   *Example*: `nvidia/nv-embed-v1`
+    -   **IAM Roles Anywhere preset**: Select the IAM Roles Anywhere preset.
+    -   **API Key preset**: Select the API Gateway preset.
+    -   **Custom CA Path preset**: Select the CA path preset if required.
+    -   **Model Key**: The identifier for the embedding model exposed by the backend service.
     -   **Prompt Cost**: (Optional) Enter the cost per 1,000 tokens for embeddings.
 4.  Save the connection. You can now use it in recipes like "Split & Embed" or in RAG agents.
 
@@ -115,8 +116,12 @@ To use the model for generating text embeddings:
 
 ## Development Notes
 
-*   **Message Transformation**: The `create_payload` function in `utils.py` is crucial for tool-calling compatibility. It transforms the `toolCalls` and `toolOutputs` from Dataiku's format into the `tool_calls` and `tool_call_id` format expected by many OpenAI-compatible APIs.
+*   **Shared Configuration Flow**: `AWSGatewayMixin` centralizes preset loading, validation, and AWS session creation for both chat and embedding requests.
+*   **Message Transformation**: The `create_payload_ge_custom_text` function in `utils.py` transforms the `toolCalls` and `toolOutputs` from Dataiku's format into the `tool_calls` and `tool_call_id` format expected by the backend service.
 *   **Multimodal Message Handling**: The plugin automatically detects and transforms Dataiku's `parts` format (containing `TEXT`, `IMAGE_INLINE`, and `IMAGE_URL` types) into OpenAI's multimodal content format, enabling seamless integration with Vision Language Models (VLMs).
-*   **Streaming Logic**: The `process_stream` function handles Server-Sent Events (SSE) from the API, parsing `data:` lines and yielding structured chunks (text, tool calls, or metadata) that the Dataiku framework can understand.
+*   **AWS Authentication**: Requests are signed using `SigV4Auth` for the `execute-api` service, and the API key is added as an `x-api-key` header before the request is sent.
+*   **Optional Role Assumption**: When enabled, the plugin first authenticates with a base role through IAM Roles Anywhere and then assumes a target role using STS.
+*   **Response Parsing**: The plugin supports both a GE gateway response format containing `body.model_output.generated_text` and a more OpenAI-like response format containing `choices[0].message`.
+*   **Streaming Logic**: Streaming helper code is retained in comments for reference, but the active implementation currently uses non-streaming requests only.
 *   **Logging**: Comprehensive logging has been implemented throughout the codebase using Python's standard `logging` module, providing detailed insights at INFO, DEBUG, WARNING, and ERROR levels for monitoring and troubleshooting.
 *   **Error Handling**: The code includes basic error handling for API requests and malformed responses to ensure stability.
