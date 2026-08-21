@@ -156,13 +156,13 @@ class MyLLM(AWSGatewayMixin, BaseLLM):
                 
         try:
             response = utils.call_api_gateway(session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
+            logger.info("Received response from API")
+            logger.info(f"Response status code: {response.status_code}")
+            logger.debug(f"=== Received Response Body: {response.text}")
+
             response.raise_for_status()
             response_data = response.json()
             
-            logger.info("Successfully received response from API")
-            logger.info(f"Response status code: {response.status_code}")
-            logger.debug(f"=== Received Response Body: {response_data}")
-
             return utils.parse_response(response_data, self.prompt_cost, self.completion_cost)
 
         except (ValueError, KeyError) as e:
@@ -289,11 +289,11 @@ class MyEmbeddingModel(AWSGatewayMixin, BaseEmbeddingModel):
 
         try: 
             response = utils.call_api_gateway(session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
-            response.raise_for_status()
-            response_data = response.json()
-
             logger.info(f"Response status code: {response.status_code}")
-            logger.debug(f"=== Received Response Body: {response_data}")            
+            logger.debug(f"=== Received Response Body: {response.text}")  
+
+            response.raise_for_status()          
+            response_data = response.json()
             
             if not response_data.get('data') or not response_data['data'][0].get('embedding'):
                 logger.error("API response missing valid embedding vector")
