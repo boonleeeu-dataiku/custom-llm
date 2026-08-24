@@ -180,7 +180,7 @@ def create_auth_headers(api_key: str) -> dict:
         "x-api-key": api_key
     }
 
-def create_custom_ge_payload_multimode_chat(model: str, query: dict, settings: dict) -> dict:
+def create_custom_get_payload_multimodal_chat(model: str, query: dict, settings: dict) -> dict:
     """
     Create the JSON payload for the API request.
 
