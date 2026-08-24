@@ -152,7 +152,7 @@ class MyLLM(AWSGatewayMixin, BaseLLM):
         # We explicitly set stream to False in the payload.
         request_settings = dict(settings or {})
         request_settings['stream'] = False
-        payload = utils.create_custom_ge_payload_multimode_chat(self.model, query, request_settings)
+        payload = utils.create_custom_get_payload_multimodal_chat(self.model, query, request_settings)
                 
         try:
             response = utils.call_api_gateway(session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
