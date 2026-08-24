@@ -420,19 +420,19 @@ def create_custom_ge_payload_embedding_text(model_id: str, image_path: Optional[
         "embed-multilingual-v3": "5a2ac66c-93ce-4ab3-a7b0-822a0945dac4"
     }
 
-    if model_id == "embed-v4-global":
+    if model_id.lower() == "embed-v4-global":
         return {
             "applicationConfigId": CONFIG_IDS['embed-v4-global'],
             "inputType": "search_document"
         }
 
-    elif model_id == "embed-english-v3":
+    elif model_id.lower() == "embed-english-v3":
         return {
             "applicationConfigId": CONFIG_IDS['embed-english-v3'],
             "inputType": "search_document"
         }
 
-    elif model_id == "embed-multilingual-v3":
+    elif model_id.lower() == "embed-multilingual-v3":
         return {
             "applicationConfigId": CONFIG_IDS['embed-multilingual-v3'],
             "inputType": "search_query"
