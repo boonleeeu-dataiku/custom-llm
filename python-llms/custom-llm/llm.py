@@ -297,7 +297,7 @@ class MyEmbeddingModel(AWSGatewayMixin, BaseEmbeddingModel):
             response.raise_for_status()          
             response_data = response.json()
             
-            if not response_data.get('embeddings'):
+            if not response_data['embeddings']['float'][0]:
                 logger.error("API response missing valid embedding vector")
                 raise ValueError("API response did not contain a valid embedding vector.")
             
