@@ -1,6 +1,7 @@
 import logging
 import json
 import subprocess
+from typing import Any, Dict, Optional
 import boto3
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
@@ -179,7 +180,7 @@ def create_auth_headers(api_key: str) -> dict:
         "x-api-key": api_key
     }
 
-def create_payload_ge_custom_text(model: str, query: dict, settings: dict) -> dict:
+def create_custom_ge_payload_multimode_chat(model: str, query: dict, settings: dict) -> dict:
     """
     Create the JSON payload for the API request.
 
@@ -404,7 +405,60 @@ def get_mimetype(b64_string):
             return mime
     return "image/png"  # Fallback to PNG if unknown
 
+def create_custom_ge_payload_embedding_text(model_id: str, image_path: Optional[str] = None) -> Dict[str, Any]:
+    """Build and return an embedding request payload based on GE's requirements at Bedrock.
 
+    :param model_id: The ID of the model to use.
+    :param image_path: Path to the image file (required for case 4).
+    :return: Payload dictionary configured for the specific test case.
+    """
+
+    # Define constant mapping for Case UUIDs
+    CONFIG_IDS = {
+        "embed-v4-global": "ba268aab-1e71-450a-a572-99b9c5dd8b08",
+        "embed-english-v3": "e5ae9094-5576-4df3-abcd-db63c3ab7a13",
+        "embed-multilingual-v3": "5a2ac66c-93ce-4ab3-a7b0-822a0945dac4"
+    }
+
+    if model_id == "embed-v4-global":
+        return {
+            "applicationConfigId": CONFIG_IDS['embed-v4-global'],
+            "inputType": "search_document"
+        }
+
+    elif model_id == "embed-english-v3":
+        return {
+            "applicationConfigId": CONFIG_IDS['embed-english-v3'],
+            "inputType": "search_document"
+        }
+
+    elif model_id == "embed-multilingual-v3":
+        return {
+            "applicationConfigId": CONFIG_IDS['embed-multilingual-v3'],
+            "inputType": "search_query"
+        }
+
+    # elif model_id == "xxx":
+    #     if not image_path or not os.path.isfile(image_path):
+    #         raise FileNotFoundError(
+    #             f"Valid image_path required for case 4. Got: {image_path}"
+    #         )
+
+    #     with open(image_path, "rb") as image_file:
+    #         image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
+
+    #     return {
+    #         "applicationConfigId": CONFIG_IDS['embed-english-v3'],
+    #         "texts": ["Insurance claim document image."],
+    #         "images": [image_base64],
+    #         "inputType": "search_document",
+    #     }
+
+    else:
+        raise ValueError(
+            f"Invalid model_id '{model_id}'. Model ID not found."
+        )
+    
 # def create_payload(model: str, query: dict, settings: dict) -> dict:
 #     """
 #     Create the JSON payload for the API request.

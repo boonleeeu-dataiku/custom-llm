@@ -152,7 +152,7 @@ class MyLLM(AWSGatewayMixin, BaseLLM):
         # We explicitly set stream to False in the payload.
         request_settings = dict(settings or {})
         request_settings['stream'] = False
-        payload = utils.create_payload_ge_custom_text(self.model, query, request_settings)
+        payload = utils.create_custom_ge_payload_multimode_chat(self.model, query, request_settings)
                 
         try:
             response = utils.call_api_gateway(session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
@@ -278,14 +278,16 @@ class MyEmbeddingModel(AWSGatewayMixin, BaseEmbeddingModel):
 
         logger.debug(f"Creating embedding for text of length: {len(text_to_embed)}")
         
-        #headers = utils.create_auth_headers(self.api_key)
-        payload = {
-            "input": [text_to_embed],
-            "model": self.model,
-            "input_type": "query",
-            "encoding_format": "float",
-            "truncate": "NONE"
-        }
+        payload = utils.create_custom_ge_payload_embedding_text(self.model)
+        payload['texts'] = [text_to_embed]
+
+        # payload = {
+        #     "input": [text_to_embed],
+        #     "model": self.model,
+        #     "input_type": "query",
+        #     "encoding_format": "float",
+        #     "truncate": "NONE"
+        # }
 
         try: 
             response = utils.call_api_gateway(session, self.api_gateway_url, "POST", self.region, self.api_key, payload, self.ca_path)
@@ -295,11 +297,11 @@ class MyEmbeddingModel(AWSGatewayMixin, BaseEmbeddingModel):
             response.raise_for_status()          
             response_data = response.json()
             
-            if not response_data.get('data') or not response_data['data'][0].get('embedding'):
+            if not response_data.get('embeddings'):
                 logger.error("API response missing valid embedding vector")
                 raise ValueError("API response did not contain a valid embedding vector.")
             
-            embedding = response_data['data'][0]['embedding']
+            embedding = response_data['embeddings']['float'][0]
             usage = response_data.get('usage', {})
             prompt_tokens = usage.get('prompt_tokens', 0)
             cost = utils.calculate_cost(prompt_tokens, 0, self.prompt_cost, 0)
