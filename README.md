@@ -43,7 +43,7 @@ Follow these steps to set up and use this custom LLM plugin in your Dataiku DSS 
 
 ### 1. Installation
 
--   Zip the contents of this repository.
+-   Build the zip from a release tag, e.g. `git archive --format=zip -o custom-llm-1.3.2.zip v1.3.2` (see [Versioning & Releases](#versioning--releases)).
 -   In Dataiku DSS, navigate to **Administration > Plugins > Add Plugin > Upload**.
 -   Upload the zipped plugin file.
 -   Ensure the `aws_signing_helper` binary is installed on the DSS node and available to the DSS process.
@@ -88,6 +88,21 @@ To use the model for generating text embeddings:
     -   **Model Key**: The identifier for the embedding model exposed by the backend service.
     -   **Prompt Cost**: (Optional) Enter the cost per 1,000 tokens for embeddings.
 4.  Save the connection. You can now use it in recipes like "Split & Embed" or in RAG agents.
+
+## Versioning & Releases
+
+Releases follow [Semantic Versioning](https://semver.org/). The version in `plugin.json` must match the git tag `vX.Y.Z`.
+
+*   **Develop on `main`** using short-lived feature branches and PRs.
+*   **Release**: bump `version` in `plugin.json`, commit, then `git tag -a vX.Y.Z -m "X.Y.Z" && git push origin vX.Y.Z`.
+*   **Patch an older release**: create `release/X.Y` from the tag only when needed (`git switch -c release/1.3 v1.3.2`), cherry-pick the fix with `git cherry-pick -x <sha>`, bump the patch version, and tag it (e.g. `v1.3.3`).
+*   **Deploy a specific version**: `git archive --format=zip -o custom-llm-X.Y.Z.zip vX.Y.Z` and upload the zip in DSS. `.gitattributes` keeps `state.json` (DSS-generated) out of the zip.
+
+| Environment | Plugin version |
+|---|---|
+| dev | _fill in_ |
+| uat | _fill in_ |
+| prod | _fill in_ |
 
 ## Project Structure
 
