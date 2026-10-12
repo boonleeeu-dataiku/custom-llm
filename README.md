@@ -102,7 +102,7 @@ Releases follow [Semantic Versioning](https://semver.org/). The version in `plug
 |---|---|
 | dev | _fill in_ |
 | uat | v1.3.2-uat |
-| prod | _fill in_ |
+| prod | v1.3.3-prod |
 
 ## Project Structure
 

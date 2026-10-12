@@ -44,7 +44,7 @@
             "label": "Model Key",
             "type": "STRING",
             "description": "Model value supported by the API endpoint. For reference visit: https://build.nvidia.com/explore/discover",
-            "defaultValue": "openai/gpt-oss-20b",
+            "defaultValue": "anthropic.claude-sonnet-5",
             "mandatory": true
         },
         {

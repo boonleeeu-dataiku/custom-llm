@@ -258,12 +258,25 @@ def create_custom_get_payload_multimodal_chat(model: str, query: dict, settings:
             transformed_messages.append(message)
             
     logger.debug(f"Transformed {len(original_messages)} messages to {len(transformed_messages)} messages")
-    
+
+    # Define constant mapping for Case UUIDs
+    CONFIG_IDS = {
+        "anthropic.claude-opus-5": "0f854be0-aec7-473e-bfbd-a829bd8784fd",
+        "anthropic.claude-sonnet-5": "a6d197b9-dbeb-41e1-89bf-7a36215c9ffa",
+        "anthropic.claude-haiku-4-5": "8be71709-8e51-4634-878e-a97e715ab333"
+    }
+
+    application_config_id = CONFIG_IDS.get((model or "").lower())
+    if not application_config_id:
+        raise ValueError(
+            f"Invalid model '{model}'. Supported models: {', '.join(CONFIG_IDS)}"
+        )
+
     payload = {
         #"model": model,
         #"messages": transformed_messages
-        #"applicationConfigId": "fd2b1f89-c740-48ae-9462-f6a7d79933a4",
-        'inputs': transformed_messages
+        "applicationConfigId": application_config_id,
+        "requestPrompt": transformed_messages
     }
 
     # Add optional settings if provided
@@ -412,31 +425,31 @@ def create_custom_ge_payload_embedding_text(model_id: str, image_path: Optional[
     :param image_path: Path to the image file (required for case 4).
     :return: Payload dictionary configured for the specific test case.
     """
-
+    
+    logger.debug(f"Creating embedding payload for model: {model_id}")
     # Define constant mapping for Case UUIDs
     CONFIG_IDS = {
-        "embed-v4-global": "ba268aab-1e71-450a-a572-99b9c5dd8b08",
-        "embed-english-v3": "e5ae9094-5576-4df3-abcd-db63c3ab7a13",
-        "embed-multilingual-v3": "5a2ac66c-93ce-4ab3-a7b0-822a0945dac4"
+        "embed-v4": "5d1067ae-1ddb-40ce-bb09-c28e8d50495a"
     }
 
-    if model_id.lower() == "embed-v4-global":
+    if model_id.lower() == "embed-v4":
         return {
-            "applicationConfigId": CONFIG_IDS['embed-v4-global'],
+            "task": "embed",
+            "applicationConfigId": CONFIG_IDS['embed-v4'],
             "inputType": "search_document"
         }
 
-    elif model_id.lower() == "embed-english-v3":
-        return {
-            "applicationConfigId": CONFIG_IDS['embed-english-v3'],
-            "inputType": "search_document"
-        }
+    # elif model_id.lower() == "embed-english-v3":
+    #     return {
+    #         "applicationConfigId": CONFIG_IDS['embed-english-v3'],
+    #         "inputType": "search_document"
+    #     }
 
-    elif model_id.lower() == "embed-multilingual-v3":
-        return {
-            "applicationConfigId": CONFIG_IDS['embed-multilingual-v3'],
-            "inputType": "search_query"
-        }
+    # elif model_id.lower() == "embed-multilingual-v3":
+    #     return {
+    #         "applicationConfigId": CONFIG_IDS['embed-multilingual-v3'],
+    #         "inputType": "search_query"
+    #     }
 
     # elif model_id == "xxx":
     #     if not image_path or not os.path.isfile(image_path):
