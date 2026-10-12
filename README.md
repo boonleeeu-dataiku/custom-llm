@@ -43,7 +43,7 @@ Follow these steps to set up and use this custom LLM plugin in your Dataiku DSS 
 
 ### 1. Installation
 
--   Build the zip from a release tag, e.g. `git archive --format=zip -o custom-llm-1.3.2.zip v1.3.2` (see [Versioning & Releases](#versioning--releases)).
+-   Build the zip from a release tag, e.g. `git archive --format=zip -o custom-llm-1.3.2-uat.zip v1.3.2-uat` (see [Versioning & Releases](#versioning--releases)).
 -   In Dataiku DSS, navigate to **Administration > Plugins > Add Plugin > Upload**.
 -   Upload the zipped plugin file.
 -   Ensure the `aws_signing_helper` binary is installed on the DSS node and available to the DSS process.
@@ -91,7 +91,7 @@ To use the model for generating text embeddings:
 
 ## Versioning & Releases
 
-Releases follow [Semantic Versioning](https://semver.org/). The version in `plugin.json` must match the git tag `vX.Y.Z`.
+Releases follow [Semantic Versioning](https://semver.org/). The version in `plugin.json` must match the git tag `vX.Y.Z`. Environment-specific releases carry a suffix, e.g. `v1.3.2-uat`.
 
 *   **Develop on `main`** using short-lived feature branches and PRs.
 *   **Release**: bump `version` in `plugin.json`, commit, then `git tag -a vX.Y.Z -m "X.Y.Z" && git push origin vX.Y.Z`.
@@ -101,7 +101,7 @@ Releases follow [Semantic Versioning](https://semver.org/). The version in `plug
 | Environment | Plugin version |
 |---|---|
 | dev | _fill in_ |
-| uat | _fill in_ |
+| uat | v1.3.2-uat |
 | prod | _fill in_ |
 
 ## Project Structure
