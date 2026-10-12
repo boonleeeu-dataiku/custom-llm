@@ -8,10 +8,10 @@
     // Meta data for display purposes:
     "meta": {
         // label: name of the plugin as displayed, should be short
-        "label": "Python Custom LLM",
+        "label": "Python Custom LLM (UAT)",
 
         // description: longer string to help end users understand what this plugin does
-        "description": "Developed for Great Eastern Life with IAM Roles Anywhere authentication support",
+        "description": "(UAT) Developed for Great Eastern Life with IAM Roles Anywhere authentication support",
 
         "author": "shashank.gaur, boonlee.eu",
 
