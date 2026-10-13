@@ -346,7 +346,19 @@ def parse_response(response_data: dict, prompt_cost: float = 0.0, completion_cos
     #logger.debug(f"=== Received Response Body: {response_data}")
 
     # Parsing based on GE's response format:
-    if 'body' in response_data:
+    if 'responsePrompt' in response_data:
+        status = response_data.get('inferenceStatus')
+        if status and status != 'Completed':
+            raise ValueError(f"Gateway inference status '{status}': {response_data}")
+        result["text"] = response_data.get('responsePrompt') or ''
+        result["promptTokens"] = response_data.get('inputTokens', 0)
+        result["completionTokens"] = response_data.get('outputTokens', 0)
+        result["estimatedCost"] = calculate_cost(result["promptTokens"], result["completionTokens"], prompt_cost, completion_cost)
+        result["finishReason"] = "stop"
+        logger.debug(f"Extracted text content of length: {len(result['text'])}")
+
+    # Legacy gateway format (body / model_output)
+    elif 'body' in response_data:
         response_body = response_data['body']
         if isinstance(response_body, str):
             try:
@@ -363,7 +375,7 @@ def parse_response(response_data: dict, prompt_cost: float = 0.0, completion_cos
                 logger.debug(f"Extracted text content of length: {len(result['text'])}")
             elif response_body.get("errorMessage"):
                 raise ValueError(f"Gateway returned an error payload: {response_body['errorMessage']}")
-    
+
     if 'choices' in response_data and len(response_data['choices']) > 0:
         choice = response_data['choices'][0]
         message = choice.get('message', {})
@@ -438,18 +450,6 @@ def create_custom_ge_payload_embedding_text(model_id: str, image_path: Optional[
             "applicationConfigId": CONFIG_IDS['embed-v4'],
             "inputType": "search_document"
         }
-
-    # elif model_id.lower() == "embed-english-v3":
-    #     return {
-    #         "applicationConfigId": CONFIG_IDS['embed-english-v3'],
-    #         "inputType": "search_document"
-    #     }
-
-    # elif model_id.lower() == "embed-multilingual-v3":
-    #     return {
-    #         "applicationConfigId": CONFIG_IDS['embed-multilingual-v3'],
-    #         "inputType": "search_query"
-    #     }
 
     # elif model_id == "xxx":
     #     if not image_path or not os.path.isfile(image_path):
@@ -696,3 +696,57 @@ def create_custom_ge_payload_embedding_text(model_id: str, image_path: Optional[
 #         # The final chunk containing metadata should be wrapped under a 'footer' key
 #         # for the Dataiku LLM framework to recognize it as the footer.
 #         yield {"footer": final_stats}
+
+# def parse_response(response_data: dict, prompt_cost: float = 0.0, completion_cost: float = 0.0) -> dict:
+#     """
+#     Parse the API response and extract relevant information.
+
+#     Args:
+#         response_data: Raw JSON response from the API.
+#         prompt_cost: Cost per 1000 prompt tokens.
+#         completion_cost: Cost per 1000 completion tokens.
+
+#     Returns:
+#         dict: Parsed result with text, tokens, cost, and tool calls.
+#     """
+#     logger.debug("Parsing API response")
+#     result = {
+#         "text": "",  # Default fallback
+#         "promptTokens": 0,
+#         "completionTokens": 0,
+#         "estimatedCost": 0.0,
+#         "toolCalls": [],
+#     }
+
+#     if 'choices' in response_data and len(response_data['choices']) > 0:
+#         choice = response_data['choices'][0]
+#         message = choice.get('message', {})
+
+#         # Extract text content
+#         content = message.get('content')
+#         if content:
+#             result["text"] = content
+#             logger.debug(f"Extracted text content of length: {len(content)}")
+
+#         # Extract tool calls if present
+#         tool_calls = message.get('tool_calls', [])
+#         if tool_calls:
+#             # For non-streaming, return the tool_calls object directly as per API response
+#             result["toolCalls"] = tool_calls
+#             logger.debug(f"Extracted {len(tool_calls)} tool calls")
+
+#         # Correct the finish reason. If tool calls are present, it must be 'tool_calls'.
+#         if result["toolCalls"]:
+#             result["finishReason"] = "tool_calls"
+#         else:
+#             result["finishReason"] = choice.get('finish_reason', 'stop')
+#         logger.debug(f"Finish reason: {result['finishReason']}")
+
+#     usage = response_data.get('usage', {})
+#     if usage:
+#         result["promptTokens"] = usage.get('prompt_tokens', 0)
+#         result["completionTokens"] = usage.get('completion_tokens', 0) or (usage.get('total_tokens', 0) - result["promptTokens"])
+#         result["estimatedCost"] = calculate_cost(result["promptTokens"], result["completionTokens"], prompt_cost, completion_cost)
+
+#     logger.info("Successfully parsed API response")
+#     return result
